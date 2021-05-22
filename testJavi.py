@@ -26,11 +26,12 @@ def load_img(path_to_img):
     img = tf.image.decode_image(img, channels=3)
     img = tf.image.convert_image_dtype(img, tf.float32)
 
-    shape = tf.cast(tf.shape(img)[:-1], tf.float32)
-    long_dim = max(shape)
-    scale = max_dim / long_dim
+    #shape = tf.cast(tf.shape(img)[:-1], tf.float32)
+    #long_dim = max(shape)
+    #scale = max_dim / long_dim
 
-    new_shape = tf.cast(shape * scale, tf.int32)
+    #new_shape = tf.cast(shape * scale, tf.int32)
+    new_shape = tf.cast((224,224)), tf.int32)
 
     img = tf.image.resize(img, new_shape)
     img = img[tf.newaxis, :]
@@ -81,14 +82,14 @@ def style_content_loss(style_outputs, content_outputs, style_targets, content_ta
 @tf.function()
 def train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers):
     with tf.GradientTape() as tape:
-        gram_style_outputs, content_outputs = create_outputs(vgg, image,num_content_layers,num_style_layers)
+        gram_style_outputs, content_outputs = create_outputs(vgg, image,num_style_layers)
         loss = style_content_loss(gram_style_outputs, content_outputs, style_target, content_target)
 
     grad = tape.gradient(loss, image)
     opt.apply_gradients([(grad, image)])
     image.assign(clip_0_1(image))
 
-def create_outputs(vgg,image,num_content_layers,num_style_layers):
+def create_outputs(vgg,image,num_style_layers):
     preprocessed_image = tf.keras.applications.vgg19.preprocess_input(image*255.0)
     outputs = vgg(preprocessed_image)
     style_outputs = outputs[:num_style_layers]
@@ -102,12 +103,13 @@ def create_outputs(vgg,image,num_content_layers,num_style_layers):
 
 
 ## Main code
-
-content_path = tf.keras.utils.get_file('YellowLabradorLooking_new.jpg', 'https://storage.googleapis.com/download.tensorflow.org/example_images/YellowLabradorLooking_new.jpg')
-style_path = tf.keras.utils.get_file('kandinsky5.jpg','https://storage.googleapis.com/download.tensorflow.org/example_images/Vassily_Kandinsky%2C_1913_-_Composition_7.jpg')
+content_path = tf.keras.utils.get_file('summer_tree.jpg', 'https://qph.fs.quoracdn.net/main-qimg-a2535f0434b7aa5d4e0c27e80d1890b2')
+style_path = tf.keras.utils.get_file('winter_Amsterdam.jpg','https://wallpaperaccess.com/full/332689.jpg')
+#noise_path = tf.keras.utils.get_file('noise.jpg',"https://rmarcus.info/blog/assets/perlin/noise.png")
 
 content_image = load_img(content_path)
 style_image = load_img(style_path)
+#noise_image = load_img(noise_path)
 
 content_layers = ['block5_conv2'] 
 
@@ -120,7 +122,7 @@ style_layers = ['block1_conv1',
 num_content_layers = len(content_layers)
 num_style_layers = len(style_layers)
 
-# Style content model
+# Style and content model
 vgg = vgg_layers(style_layers + content_layers)
 
 preprocessed_content_image = tf.keras.applications.vgg19.preprocess_input(content_image*255)
@@ -134,10 +136,8 @@ image = tf.Variable(content_image)
 
 opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
 
-train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
-train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
-train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
-train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
+for i in range(20):
+    train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
 
 PIL_image = tensor_to_image(image)
 
