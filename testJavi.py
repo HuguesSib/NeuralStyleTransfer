@@ -3,6 +3,8 @@ import tensorflow as tf
 import IPython.display as display
 import matplotlib.pyplot as plt
 import matplotlib as mpl
+mpl.rcParams['figure.figsize'] = (12, 12)
+mpl.rcParams['axes.grid'] = False
 import numpy as np
 import PIL.Image
 import time
@@ -132,4 +134,11 @@ image = tf.Variable(content_image)
 
 opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
 
-train_step(vgg,image, style_target, content_target, num_content_layers,num_style_layers)
+train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
+train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
+train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
+train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
+
+PIL_image = tensor_to_image(image)
+
+PIL_image.show()
