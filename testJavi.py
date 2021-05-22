@@ -56,37 +56,37 @@ def imshow(image, title=None):
         plt.title(title)
 
 
-def vgg_layers(layer_names):
-    """ Creates a vgg model that returns a list of intermediate output values."""
+def vgg_model(layer_names):
     # Load our model. Load pretrained VGG, trained on imagenet data
     vgg = tf.keras.applications.VGG19(include_top=False, weights='imagenet')
     vgg.trainable = False
-
-    outputs = [vgg.get_layer(name).output for name in layer_names]
-
-    model = tf.keras.Model([vgg.input], outputs)
-    return model
+    #Retrieve input and output layers of the model
+    inputs = [vgg.input]
+    outputs = []
+    for name in layer_names:
+        outputs.append(vgg.get_layer(name).output)
+    # Model groups layers into an object with training and inference features
+    return  tf.keras.Model(inputs, outputs)
 
 
 def gram_matrix(input_tensor):
     gram = tf.matmul(input_tensor, input_tensor, transpose_a=False, transpose_b=True)
-    return gram
-
-
-def clip_0_1(image):
-    return tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0)
-
+    xshape = input_tensor.get_shape().as_list()
+    l = 1
+    for elem in xshape:
+        l *= elem
+    return gram / l
 
 def style_content_loss(style_outputs, content_outputs, style_targets, content_targets):
     style_weight = 1e-2
     content_weight = 1e4
 
     style_loss = tf.add_n([tf.reduce_mean((style_outputs[i] - gram_matrix(style_targets[i])) ** 2)
-                           for i in range(len(style_outputs))])
+                        for i in range(len(style_outputs))])
     style_loss *= style_weight / num_style_layers
 
     content_loss = tf.add_n([tf.reduce_mean((content_outputs[i] - content_targets[i]) ** 2)
-                             for i in range(len(content_outputs))])
+                        for i in range(len(content_outputs))])
     content_loss *= content_weight / num_content_layers
     loss = style_loss + content_loss
     return loss
@@ -102,7 +102,7 @@ def train_step(vgg, image, style_target, content_target, num_content_layers, num
 
     grad = tape.gradient(loss, image)
     opt.apply_gradients([(grad, image)])
-    image.assign(clip_0_1(image))
+    image.assign(tf.clip_by_value(image, clip_value_min=0.0, clip_value_max=1.0))
 
 
 def create_outputs(vgg, image, num_style_layers):
@@ -121,26 +121,32 @@ def create_outputs(vgg, image, num_style_layers):
 ## Main code
 if __name__ == '__main__':
     content_path = tf.keras.utils.get_file('summer_tree.jpg',
-                                           'https://qph.fs.quoracdn.net/main-qimg-a2535f0434b7aa5d4e0c27e80d1890b2')
+                                        'https://qph.fs.quoracdn.net/main-qimg-a2535f0434b7aa5d4e0c27e80d1890b2')
     style_path = tf.keras.utils.get_file('winter_Amsterdam.jpg', 'https://wallpaperaccess.com/full/332689.jpg')
 
     content_image, h, w = load_img(content_path)
     style_image = load_img(style_path, h, w)
     noise_image = create_noise_image(h, w)  # load_img(noise_path)
 
-    content_layers = ['block5_conv2']
+    plt.subplot(1,2,1)
+    imshow(content_image, 'Content Image')
+    plt.subplot(1,2,2)
+    imshow(style_image, 'Style Image')
+    plt.show()
 
-    style_layers = ['block1_conv1',
-                    'block2_conv1',
-                    'block3_conv1',
-                    'block4_conv1',
-                    'block5_conv1']
+    #Get the name of the VGG19 by loading a dummy model
+
+    # vgg_test = tf.keras.applications.VGG19(include_top=False)
+    # for i in vgg_test.layers:
+    # print(i.name)
+    content_layers = ['block5_conv2']
+    style_layers = ['block1_conv1', 'block2_conv1','block3_conv1','block4_conv1','block5_conv1']
 
     num_content_layers = len(content_layers)
     num_style_layers = len(style_layers)
 
     # Style and content model
-    vgg = vgg_layers(style_layers + content_layers)
+    vgg = vgg_model(style_layers + content_layers)
 
     preprocessed_content_image = tf.keras.applications.vgg19.preprocess_input(content_image * 255)
     preprocessed_style_image = tf.keras.applications.vgg19.preprocess_input(style_image * 255)
