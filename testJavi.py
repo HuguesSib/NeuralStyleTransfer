@@ -1,15 +1,8 @@
 import os
 import tensorflow as tf
-import IPython.display as display
 import matplotlib.pyplot as plt
-import matplotlib as mpl
-mpl.rcParams['figure.figsize'] = (12, 12)
-mpl.rcParams['axes.grid'] = False
 import numpy as np
 import PIL.Image
-import time
-import functools
-
 from tensorflow.python.keras.applications.densenet import preprocess_input
 
 def tensor_to_image(tensor):
@@ -21,20 +14,22 @@ def tensor_to_image(tensor):
     return PIL.Image.fromarray(tensor)
 
 def load_img(path_to_img):
-    max_dim = 512
+    # Load the image
     img = tf.io.read_file(path_to_img)
     img = tf.image.decode_image(img, channels=3)
     img = tf.image.convert_image_dtype(img, tf.float32)
 
-    #shape = tf.cast(tf.shape(img)[:-1], tf.float32)
-    #long_dim = max(shape)
-    #scale = max_dim / long_dim
+    # Standardize its size
+    img = tf.image.resize(img, tf.cast((224,224), tf.int32))
+    img = tf.reshape(img,(1,224,224,3))
 
-    #new_shape = tf.cast(shape * scale, tf.int32)
-    new_shape = tf.cast((224,224)), tf.int32)
+    return img
 
-    img = tf.image.resize(img, new_shape)
-    img = img[tf.newaxis, :]
+def create_noise_image(width,height):
+    img = np.random.uniform(0,1,(width,height,3))
+    img = tf.image.convert_image_dtype(img, tf.float32)
+    img = tf.reshape(img,(1,width,height,3))
+
     return img
 
 def imshow(image, title=None):
@@ -81,10 +76,12 @@ def style_content_loss(style_outputs, content_outputs, style_targets, content_ta
 
 @tf.function()
 def train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers):
+    high_freq_weight = 50
     with tf.GradientTape() as tape:
         gram_style_outputs, content_outputs = create_outputs(vgg, image,num_style_layers)
         loss = style_content_loss(gram_style_outputs, content_outputs, style_target, content_target)
-
+        loss += high_freq_weight*tf.image.total_variation(image)
+        
     grad = tape.gradient(loss, image)
     opt.apply_gradients([(grad, image)])
     image.assign(clip_0_1(image))
@@ -105,11 +102,10 @@ def create_outputs(vgg,image,num_style_layers):
 ## Main code
 content_path = tf.keras.utils.get_file('summer_tree.jpg', 'https://qph.fs.quoracdn.net/main-qimg-a2535f0434b7aa5d4e0c27e80d1890b2')
 style_path = tf.keras.utils.get_file('winter_Amsterdam.jpg','https://wallpaperaccess.com/full/332689.jpg')
-#noise_path = tf.keras.utils.get_file('noise.jpg',"https://rmarcus.info/blog/assets/perlin/noise.png")
 
 content_image = load_img(content_path)
 style_image = load_img(style_path)
-#noise_image = load_img(noise_path)
+noise_image = create_noise_image(224,224) #load_img(noise_path)
 
 content_layers = ['block5_conv2'] 
 
@@ -132,13 +128,12 @@ content_target = content_target[num_style_layers:]
 style_target = vgg(preprocessed_style_image)
 style_target = style_target[:num_style_layers]
 
-image = tf.Variable(content_image)
+image = tf.Variable(noise_image)
 
 opt = tf.optimizers.Adam(learning_rate=0.02, beta_1=0.99, epsilon=1e-1)
 
-for i in range(20):
+for i in range(4):
     train_step(vgg, image, style_target, content_target, num_content_layers,num_style_layers)
 
 PIL_image = tensor_to_image(image)
-
 PIL_image.show()
