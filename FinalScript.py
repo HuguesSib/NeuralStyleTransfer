@@ -70,7 +70,7 @@ def vgg_model(layer_names):
     # Model groups layers into an object with training and inference features
     return  tf.keras.Model(inputs, outputs)
 
-
+# Taken from https://colab.research.google.com/github/tensorflow/docs/blob/master/site/en/tutorials/generative/style_transfer.ipynb#scrollTo=_UWQmeEaiKkP
 def gram_matrix(input_tensor):
      gram = tf.linalg.einsum('bijc,bijd->bcd', input_tensor, input_tensor)
      xshape = input_tensor.get_shape().as_list()
